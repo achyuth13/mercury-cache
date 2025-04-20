@@ -1,13 +1,25 @@
-package com.caramel.mercury
+package com.caramel.mercury.shared_preferences
 
 import android.content.Context
-import com.caramel.mercury.datastores.SharedPreferencesStore
+import com.caramel.mercury.Cache
+import com.caramel.mercury.scorer_interface.ScorerInterface
 import com.caramel.mercury.heatmap.HeatMapManager
 import com.caramel.mercury.promotion_policy.PromotionPolicy
 import com.caramel.mercury.promotion_policy.TopNPromotionPolicy
 import com.caramel.mercury.utils.Logger
 import com.google.gson.Gson
 
+/**
+ * Mercury shared preferences
+ *
+ * @property scorer
+ * @property heatMapSize
+ * @property promotionPolicy
+ * @constructor
+ *
+ * @param context
+ * @param name
+ */
 class MercurySharedPreferences(
     context: Context,
     name: String,
@@ -17,18 +29,17 @@ class MercurySharedPreferences(
 ) : Cache<String, Any> {
 
     private val gson = Gson()
-    private val store = SharedPreferencesStore(context, name)
-    private val heatMap = HeatMapManager(context, name, heatMapSize)
+    private val sharedPreferences = SharedPreferencesStore(context, name)
+    private val heatMap = HeatMapManager(context, name)
 
     override fun put(key: String, value: Any) {
-        store.put(key, gson.toJson(value))
+        sharedPreferences.put(key, gson.toJson(value))
         scorer.scoreKey(key)
         tryPromote(key, value)
     }
 
     override fun get(key: String): Any? {
         heatMap.get(key)?.let { (jsonValue, type, _) ->
-//            Logger.log("HACK", "🔁 Found in HeatMap: $key → $jsonValue (type: $type)")
             scorer.scoreKey(key)
             val newScore = scorer.getScore(key)
             val clazz = try {
@@ -36,28 +47,27 @@ class MercurySharedPreferences(
             } catch (e: Exception) {
                 return null
             }
-            val obj = gson.fromJson(jsonValue, clazz)
-            heatMap.put(key, obj, newScore)
-            return obj
+            val value = gson.fromJson(jsonValue, clazz)
+            heatMap.put(key, value, newScore)
+            return value
         }
 
-        val jsonValue = store.get(key, String::class.java) ?: return null
-//        Logger.log("HACK", "🔁 Found in Prefs: $key → $jsonValue")
+        val jsonValue = sharedPreferences.get(key, String::class.java) ?: return null
 
-        val obj = gson.fromJson(jsonValue, Any::class.java)
+        val value = gson.fromJson(jsonValue, Any::class.java)
         scorer.scoreKey(key)
-        tryPromote(key, obj)
-        return obj
+        tryPromote(key, value)
+        return value
     }
 
     override fun remove(key: String) {
         heatMap.remove(key)
-        store.remove(key)
+        sharedPreferences.remove(key)
     }
 
     override fun clear() {
         heatMap.clear()
-        store.clear()
+        sharedPreferences.clear()
     }
 
     private fun tryPromote(key: String, value: Any) {
@@ -71,22 +81,15 @@ class MercurySharedPreferences(
             heatMap.getLowestScore()
         )
 
-//        Logger.log("HACK", "💡 Promotion Decision → promote=$shouldPromote for $key with score=$score")
-//        Logger.log("HACK", "📊 HeatMap Size=${heatMap.getAll().size}, heatMapSizeLimit=$heatMapSize, LowestScore=${heatMap.getLowestScore()}")
-
         if (shouldPromote) {
             if (heatMap.getAll().size >= heatMapSize) {
                 val lowest = heatMap.getLowestScoreKey()
                 if (lowest != null) {
                     heatMap.remove(lowest)
-//                    Logger.log("HACK", "🧹 Evicted from HeatMap → $lowest")
                 }
             }
             heatMap.put(key, value, score)
-//            Logger.log("HACK", "🔥 PROMOTED to HeatMap → $key: $value")
         }
         Logger.log("HACK", "🔥 Heatmap AFTER Promotion: ${heatMap.getAll()}")
     }
-
-
 }
