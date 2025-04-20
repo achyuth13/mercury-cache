@@ -1,4 +1,4 @@
-package com.caramel.mercury
+package com.caramel.mercury.cache
 
 /**
  * Cache

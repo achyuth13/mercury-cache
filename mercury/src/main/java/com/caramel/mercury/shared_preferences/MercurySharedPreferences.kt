@@ -1,7 +1,7 @@
 package com.caramel.mercury.shared_preferences
 
 import android.content.Context
-import com.caramel.mercury.Cache
+import com.caramel.mercury.cache.Cache
 import com.caramel.mercury.scorer_interface.ScorerInterface
 import com.caramel.mercury.heatmap.HeatMapManager
 import com.caramel.mercury.promotion_policy.PromotionPolicy

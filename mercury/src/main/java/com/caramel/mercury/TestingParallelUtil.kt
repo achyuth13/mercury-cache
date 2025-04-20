@@ -1,6 +1,7 @@
 package com.caramel.mercury
 
 import android.content.Context
+import com.caramel.mercury.cache.MercuryCacheType
 import com.caramel.mercury.scorer_interface.TestingScorerInterface
 import com.caramel.mercury.utils.Logger
 import kotlinx.coroutines.CoroutineScope
