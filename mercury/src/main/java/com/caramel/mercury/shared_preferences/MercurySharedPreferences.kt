@@ -8,6 +8,11 @@ import com.caramel.mercury.promotion_policy.PromotionPolicy
 import com.caramel.mercury.promotion_policy.TopNPromotionPolicy
 import com.caramel.mercury.utils.Logger
 import com.google.gson.Gson
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Mercury shared preferences
@@ -28,35 +33,50 @@ class MercurySharedPreferences(
     private val promotionPolicy: PromotionPolicy = TopNPromotionPolicy()
 ) : Cache<String, Any> {
 
+    private val TAG = "BENCHMARK"
+
     private val gson = Gson()
     private val sharedPreferences = SharedPreferencesStore(context, name)
     private val heatMap = HeatMapManager(context, name)
 
+    @OptIn(DelicateCoroutinesApi::class)
     override fun put(key: String, value: Any) {
-        sharedPreferences.put(key, gson.toJson(value))
-        scorer.scoreKey(key)
-        tryPromote(key, value)
+        val json = gson.toJson(value)
+        sharedPreferences.put(key, json)
+        GlobalScope.launch(Dispatchers.IO) {
+            scorer.scoreKey(key)
+            val score = scorer.getScore(key)
+            tryPromote(key, value, score)
+        }
     }
 
+
+    @OptIn(DelicateCoroutinesApi::class)
     override fun get(key: String): Any? {
-        heatMap.get(key)?.let { (jsonValue, type, _) ->
-            scorer.scoreKey(key)
-            val newScore = scorer.getScore(key)
-            val clazz = try {
-                Class.forName(type)
-            } catch (e: Exception) {
-                return null
+        val entry = heatMap.get(key)
+        Logger.log(TAG, "Entry for heatmap $entry")
+        if (entry != null) {
+            GlobalScope.launch(Dispatchers.IO) {
+                Logger.log(TAG, "Scoring in parallel for $entry in heatmap ${System.currentTimeMillis()}")
+                scorer.scoreKey(key)
+                val score = scorer.getScore(key)
+                tryPromote(key, entry.value, score)
             }
-            val value = gson.fromJson(jsonValue, clazz)
-            heatMap.put(key, value, newScore)
-            return value
+            Logger.log(TAG, "Fetching from heatmap for $key and the value is ${entry.value}")
+            return entry.value
         }
 
+        // Slow path: Read from disk
         val jsonValue = sharedPreferences.get(key, String::class.java) ?: return null
-
         val value = gson.fromJson(jsonValue, Any::class.java)
-        scorer.scoreKey(key)
-        tryPromote(key, value)
+
+        GlobalScope.launch(Dispatchers.IO) {
+            Logger.log(TAG, "Scoring in parallel for $key in prefs ${System.currentTimeMillis()}")
+            scorer.scoreKey(key)
+            val score = scorer.getScore(key)
+            tryPromote(key, value, score)
+        }
+
         return value
     }
 
@@ -70,26 +90,28 @@ class MercurySharedPreferences(
         sharedPreferences.clear()
     }
 
-    private fun tryPromote(key: String, value: Any) {
-        val score = scorer.getScore(key)
-
-        val alreadyInHeatMap = heatMap.get(key) != null
-        val shouldPromote = alreadyInHeatMap || promotionPolicy.shouldPromote(
-            heatMap.getAll().size,
+    @Synchronized
+    private fun tryPromote(key: String, value: Any, score: Int) {
+        val currentMap = heatMap.getAll()
+        val shouldPromote = promotionPolicy.shouldPromote(
+            currentMap.size,
             heatMapSize,
             score,
             heatMap.getLowestScore()
         )
 
+        Logger.log(TAG, "Checking promotion for $key with score=$score = $shouldPromote")
+
         if (shouldPromote) {
-            if (heatMap.getAll().size >= heatMapSize) {
-                val lowest = heatMap.getLowestScoreKey()
-                if (lowest != null) {
-                    heatMap.remove(lowest)
-                }
+            Logger.log(TAG, "Promoting $key with $value and Score $score")
+            if (currentMap.size >= heatMapSize) {
+                Logger.log(TAG, "Lowest score ${heatMap.getLowestScoreKey()}")
+                heatMap.getLowestScoreKey()?.let { heatMap.remove(it) }
             }
             heatMap.put(key, value, score)
         }
-        Logger.log("HACK", "🔥 Heatmap AFTER Promotion: ${heatMap.getAll()}")
+
+        Logger.log(TAG, "Heatmap AFTER Promotion: ${heatMap.getAll()}")
     }
+
 }

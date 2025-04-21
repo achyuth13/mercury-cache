@@ -2,8 +2,10 @@ package com.caramel.mercury.heatmap
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.caramel.mercury.utils.Logger
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Heat map manager
@@ -16,7 +18,8 @@ import com.google.gson.reflect.TypeToken
 class HeatMapManager(context: Context, name: String) {
     private val heatMapPrefs: SharedPreferences =
         context.getSharedPreferences("mercury_heat_map_$name", Context.MODE_PRIVATE)
-    private val heatMap: LinkedHashMap<String, HeatMapEntry> = linkedMapOf()
+    private val heatMap: ConcurrentHashMap<String, HeatMapEntry> = ConcurrentHashMap()
+
     private val gson = Gson()
 
     init {
@@ -38,12 +41,12 @@ class HeatMapManager(context: Context, name: String) {
      * @param value
      * @param score
      */
-    fun put(key: String, value: Any, score: Int) = synchronized(this) {
-        val jsonValue = gson.toJson(value)
-        val type = value::class.java.name
-        heatMap[key] = HeatMapEntry(jsonValue, type, score)
+    fun put(key: String, value: Any, score: Int) {
+        val type = value.javaClass.name
+        heatMap[key] = HeatMapEntry(value, type, score)
         persist()
     }
+
 
     /**
      * Remove
@@ -77,6 +80,7 @@ class HeatMapManager(context: Context, name: String) {
      * @return
      */
     fun getLowestScore(): Int = synchronized(this) {
+        Logger.log("BENCHMARK","${heatMap.values}  " )
         return heatMap.values.minOfOrNull { it.score } ?: Int.MIN_VALUE
     }
 
@@ -90,9 +94,14 @@ class HeatMapManager(context: Context, name: String) {
     }
 
     private fun persist() {
-        val jsonString = gson.toJson(heatMap)
-        heatMapPrefs.edit().putString("heatMap", jsonString).apply()
+        val snapshot = synchronized(this) {
+            heatMap.toMap() // create a safe immutable copy
+        }
+
+        val json = gson.toJson(snapshot)
+        heatMapPrefs.edit().putString("heatMap", json).apply()
     }
+
 
     private fun loadFromPrefs() {
         val jsonString = heatMapPrefs.getString("heatMap", null) ?: return

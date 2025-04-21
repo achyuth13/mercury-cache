@@ -36,7 +36,7 @@ object TestingParallelUtil {
 
             mercuryCacheA.put("k14", "v4-1")
             mercuryCacheA.put("k16", true)
-            repeat(10) { mercuryCacheA.get("k6") }
+            repeat(10) { mercuryCacheA.get("k16") }
 
             mercuryCacheA.put("k15", "v5")
         }

@@ -9,7 +9,7 @@ package com.caramel.mercury.heatmap
  * @constructor Create empty Heat map entry
  */
 data class HeatMapEntry(
-    val value: String,
+    val value: Any,
     val type: String,
     val score: Int
 )
