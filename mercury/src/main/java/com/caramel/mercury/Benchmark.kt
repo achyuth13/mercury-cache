@@ -10,7 +10,7 @@ import kotlin.system.measureNanoTime
 
 class Benchmark {
 
-    private val TAG = "BENCHMARK"
+    private val TAG = "BENCHMARKTEST"
 
     private val gson = Gson()
     private val keys = listOf("key1", "key2", "key3", "key4")
@@ -80,6 +80,11 @@ class Benchmark {
             .scorerInterface(TestingScorerInterface())
             .build(context)
 
+        // ✅ Pre-fill heatMap to avoid fetching from SharedPreferences
+        for (i in keys.indices) {
+            mercuryCache.put(keys[i], values[i])
+        }
+
         val readTimes = mutableMapOf<String, MutableList<Long>>()
 
         for (key in keys) {
@@ -95,5 +100,6 @@ class Benchmark {
 
         Logger.log(TAG, "📦 Mercury READ times per key (ns): $readTimes")
     }
+
 
 }

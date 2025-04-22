@@ -11,5 +11,6 @@ package com.caramel.mercury.heatmap
 data class HeatMapEntry(
     val value: Any,
     val type: String,
-    val score: Int
+    var score: Int,
+    var evict: Boolean = false
 )

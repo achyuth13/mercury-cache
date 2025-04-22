@@ -11,7 +11,7 @@ interface ScorerInterface {
      *
      * @param key
      */
-    fun scoreKey(key: String)
+    fun scoreKey(key: String) : Int
 
     /**
      * Get score
@@ -22,7 +22,7 @@ interface ScorerInterface {
     fun getScore(key: String) : Int
 
     companion object default: ScorerInterface {
-        override fun scoreKey(key: String) {}
+        override fun scoreKey(key: String): Int { return 1}
 
         override fun getScore(key: String): Int {return 0}
 

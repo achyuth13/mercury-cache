@@ -23,7 +23,7 @@ class MercurySharedPreferencesTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val scorer = object : ScorerInterface {
             private val scoreMap = mutableMapOf<String, Int>()
-            override fun scoreKey(key: String) {
+            override fun scoreKey(key: String): Int {
                 scoreMap[key] = (scoreMap[key] ?: 0) + 1
             }
 
