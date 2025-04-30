@@ -1,6 +1,7 @@
 package com.caramel.mercury
 
 import android.content.Context
+import android.util.LruCache
 
 import com.caramel.mercury.cache.MercuryCacheType
 import com.caramel.mercury.scorer_interface.TestingScorerInterface
@@ -15,6 +16,7 @@ class Benchmark {
     private val gson = Gson()
     private val keys = listOf("key1", "key2", "key3", "key4")
     private val values = listOf("value1", "value2", "value3", "value4")
+    val memoryCache = object : LruCache<String, String>(keys.size) {}
 
     // 🔵 1. Benchmark WRITE — SharedPreferences
     fun benchmarkWriteSharedPreferences(context: Context) {
@@ -51,6 +53,38 @@ class Benchmark {
 
         Logger.log(TAG, "🗂 SharedPreferences READ times per key (ns): $readTimes")
     }
+
+    // 🔴 1. Benchmark WRITE — LruCache
+    fun benchmarkWriteLruCache() {
+        val time = measureNanoTime {
+            for (i in keys.indices) {
+                memoryCache.put(keys[i], values[i])
+            }
+        }
+
+        Logger.log(TAG, "LruCache WRITE time: $time ns")
+    }
+
+    // 🔴 2. Benchmark READ — LruCache
+    fun benchmarkReadLruCache() {
+        val readTimes = mutableMapOf<String, MutableList<Long>>()
+
+        for (key in keys) {
+            val times = mutableListOf<Long>()
+            repeat(4) {
+                val time = measureNanoTime {
+                    val value = memoryCache.get(key)
+                    // Optionally simulate deserialization if needed
+//                val jsonValue = gson.fromJson(value, String::class.java)
+                }
+                times.add(time)
+            }
+            readTimes[key] = times
+        }
+
+        Logger.log(TAG, "📁 LruCache READ times per key (ns): $readTimes")
+    }
+
 
 
     // 🟣 3. Benchmark WRITE — MercurySharedPreferences
